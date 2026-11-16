@@ -1,0 +1,4 @@
+name,priority,size_bits,period_ms,speed_bps,propagation_delay_ms,processing_delay_ms
+M1,1,1000,10,500000,0.1,0.2
+M2,2,2000,20,500000,0.1,0.2
+M3,3,4000,50,500000,0.1,0.2
