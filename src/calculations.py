@@ -59,3 +59,18 @@ def arbitration_time(msg: Message, all_msgs: list[Message],
         time = new_time
 
     return float("inf")
+
+
+def jitter(delays: list[float]) -> float:
+    # Расчет разброса времени доставки в миллисекундах.
+
+    if not delays:
+        return 0.0
+
+    return max(delays) - min(delays)
+
+
+def meets_deadline(msg: float, deadline: float) -> bool:
+    # Проверка соблюдения дедлайна сообщения.
+
+    return msg <= deadline
