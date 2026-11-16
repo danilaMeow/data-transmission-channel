@@ -12,7 +12,7 @@ from calculations import (
 )
 
 
-# Включение поддержки цветов в консоли Windows.
+# цвета в консоли
 if os.name == "nt":
     import ctypes
 
@@ -24,51 +24,90 @@ if os.name == "nt":
         kernel32.SetConsoleMode(handle, mode.value | 0x0004)
 
 
-# Цвета текста.
 GREEN = "\033[92m"
 RED = "\033[91m"
 RESET = "\033[0m"
 
 
 def main():
-    # Путь к файлу с входными данными.
+    # Загрузка сообщений и параметро канала.
     filename = Path(__file__).resolve().parent.parent / "data" / "messages.csv"
-
-    # Загрузка сообщений и параметров канала.
     messages, channel = load_tasks(filename)
 
     print("Расчет характеристик канала передачи данных")
     print()
 
+    print(f"Скорость канала: {channel.speed_bps:.0f} бит/с")
+    print(f"Задержка распространения: {channel.propagation_delay_ms:.3f} мс")
+    print(f"Задержка обработки: {channel.processing_delay_ms:.3f} мс")
+    print()
+
+    # Вывод заголовка таблицы.
+    print(
+        f"{'Имя':<8}"
+        f"{'Приор.':<9}"
+        f"{'Размер':<10}"
+        f"{'Передача':<12}"
+        f"{'Доставка':<12}"
+        f"{'Арбитраж':<12}"
+        f"{'Джиттер':<11}"
+        f"{'Дедлайн':<11}"
+        f"{'Итог'}"
+    )
+
+    print("-" * 95)
+
+    results = []
+    all_ok = True
+
     for msg in messages:
-        # Расчет характеристик сообщения.
+        # Параметры сообщения.
         tx = transmission_time(msg, channel)
         delay = delivery_delay(msg, channel)
-        arbitration = arbitration_time(msg, messages, channel)
+        arb = arbitration_time(msg, messages, channel)
+        jit = jitter([delay, arb])
 
-        # Расчет джиттера.
-        jitter_value = jitter([delay, arbitration])
-
-        # Проверка дедлайна.
+        # Проверка соблюдения дедлайна.
         deadline = msg.period_ms
-        result = meets_deadline(arbitration, deadline)
+        ok = meets_deadline(arb, deadline)
 
-        print(f"Сообщение: {msg.name}")
-        print(f"Приоритет: {msg.priority}")
-        print(f"Время передачи: {tx:.3f} мс")
-        print(f"Задержка доставки: {delay:.3f} мс")
-        print(f"С учетом арбитража: {arbitration:.3f} мс")
-        print(f"Оценка джиттера: {jitter_value:.3f} мс")
-        print(f"Дедлайн: {deadline:.3f} мс")
+        results.append((msg, delay, arb, jit))
 
-        if result:
-            # Зеленый текст, если дедлайн соблюден.
-            print(f"Дедлайн соблюден: {GREEN}да{RESET}")
+        if ok:
+            status = f"{GREEN}Да{RESET}"
         else:
-            # Красный текст, если дедлайн не соблюден.
-            print(f"Дедлайн соблюден: {RED}нет{RESET}")
+            status = f"{RED}Нет{RESET}"
+            all_ok = False
 
-        print()
+        # Вывод строки таблицы.
+        print(
+            f"{msg.name:<8}"
+            f"{msg.priority:<9}"
+            f"{msg.size_bits:<10}"
+            f"{tx:<12.3f}"
+            f"{delay:<12.3f}"
+            f"{arb:<12.3f}"
+            f"{jit:<11.3f}"
+            f"{deadline:<11.3f}"
+            f"{status}"
+        )
+
+    # Вывод.
+    print()
+    print("Вывод")
+
+    for msg, delay, arb, jit in results:
+        waiting = arb - delay
+
+        print(
+            f"{msg.name}: дополнительная задержка "
+            f"{waiting:.3f} мс, джиттер {jit:.3f} мс"
+        )
+
+    if all_ok:
+        print(f"\n{GREEN}Все сообщения укладываются в дедлайны.{RESET}")
+    else:
+        print(f"\n{RED}Некоторые сообщения нарушают дедлайны.{RESET}")
 
 
 if __name__ == "__main__":
